@@ -1,0 +1,897 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -366,7 +366,7 @@
+     add_definitions(-s DISABLE_EXCEPTION_CATCHING=0)
+ 
+     # Export functions to Javascript.
+-    target_link_libraries(WASM::WASM INTERFACE "-s EXPORTED_FUNCTIONS='[\"_main\", \"_em_openttd_add_server\"]' -s EXPORTED_RUNTIME_METHODS='[\"cwrap\"]'")
++    target_link_libraries(WASM::WASM INTERFACE "-s EXPORTED_FUNCTIONS='[\"_main\", \"_em_openttd_add_server\"]' -s EXPORTED_RUNTIME_METHODS='[\"cwrap\",\"FS\",\"IDBFS\",\"UTF8ToString\"]'")
+ 
+     # Preload all the files we generate during build.
+     # As we do not compile with FreeType / FontConfig, we also have no way to
+@@ -376,6 +376,10 @@
+     # only ship the English language.
+     target_link_libraries(WASM::WASM INTERFACE "--preload-file ${CMAKE_BINARY_DIR}/baseset@/baseset")
+     target_link_libraries(WASM::WASM INTERFACE "--preload-file ${CMAKE_BINARY_DIR}/lang/english.lng@/lang/english.lng")
++    target_link_libraries(WASM::WASM INTERFACE "--preload-file ${CMAKE_BINARY_DIR}/lang/dutch.lng@/lang/dutch.lng")
++    # TransportTycoon web: bundled base graphics (OpenGFX2 Classic) and Dutch NewGRFs.
++    target_link_libraries(WASM::WASM INTERFACE "--preload-file ${CMAKE_SOURCE_DIR}/web-data/baseset/OpenGFX2_Classic@/baseset/OpenGFX2_Classic")
++    target_link_libraries(WASM::WASM INTERFACE "--preload-file ${CMAKE_SOURCE_DIR}/web-data/newgrf@/newgrf")
+     target_link_libraries(WASM::WASM INTERFACE "--preload-file ${CMAKE_SOURCE_DIR}/bin/ai@/ai")
+     target_link_libraries(WASM::WASM INTERFACE "--preload-file ${CMAKE_SOURCE_DIR}/bin/game@/game")
+     # Documentation files for the in-game text file viewer
+--- a/os/emscripten/pre.js
++++ b/os/emscripten/pre.js
+@@ -30,9 +30,17 @@
+ 
+     Module.addRunDependency('syncfs');
+     FS.syncfs(true, function (err) {
++        /* TransportTycoon web: default config and "restart from savegame". */
++        try { if (window.tt_after_fs_load) window.tt_after_fs_load(personal_dir); } catch (e) { console.error(e); }
+         Module.removeRunDependency('syncfs');
+     });
+ 
++    window.openttd_game_saved = function(path) {
++        window.openttd_syncfs(function() {
++            try { if (window.tt_on_game_saved) window.tt_on_game_saved(path, personal_dir); } catch (e) { console.error(e); }
++        });
++    }
++
+     window.openttd_syncfs_shown_warning = false;
+     window.openttd_syncfs = function(callback) {
+         /* Copy the virtual FS to the persistent storage. */
+--- a/os/emscripten/shell.html
++++ b/os/emscripten/shell.html
+@@ -1,228 +1,657 @@
+ <!doctype html>
+-<html lang="en-us">
++<html lang="nl">
+   <head>
+     <meta charset="utf-8">
+-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+-    <title>OpenTTD</title>
++    <meta name="viewport" content="width=device-width, initial-scale=1">
++    <title>OpenTTD Nederland Editie</title>
++    <meta name="description" content="OpenTTD in je browser, met de Nederlandse treinset, savegames downloaden en terugzetten.">
++    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ffc917'/%3E%3Crect x='10' y='20' width='44' height='24' rx='6' fill='%23003082'/%3E%3Crect x='15' y='25' width='10' height='8' fill='%23ffc917'/%3E%3Crect x='28' y='25' width='10' height='8' fill='%23ffc917'/%3E%3Crect x='41' y='25' width='8' height='8' fill='%23ffc917'/%3E%3Ccircle cx='20' cy='48' r='4' fill='%23222'/%3E%3Ccircle cx='44' cy='48' r='4' fill='%23222'/%3E%3C/svg%3E">
+     <style>
+-      body {
+-        font-family: Tahoma, Arial, Helvetica, sans-serif;
+-        font-size: 14px;
+-        margin: 0;
+-        padding: 0;
+-      }
+-
+-      div.background {
+-        background-image: url("data:image/png;base64,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");
+-        border: 0px none;
+-        display: flex;
+-        height: 100%;
+-        position: absolute;
+-        width: 100%;
+-        z-index: 1;
+-      }
+-
+-      div.overlay {
+-        height: 40px;
+-        margin: 0 auto;
+-        opacity: 0;
+-        pointer-events: none;
+-        position: absolute;
++      :root {
++        --blue: #003082;
++        --blue-2: #0a4bb5;
++        --yellow: #ffc917;
++        --ink: #f4f6fb;
++        --muted: #aab4c8;
++        --panel: rgba(13, 22, 44, 0.94);
++        --line: rgba(255, 255, 255, 0.14);
++        --danger: #e5484d;
++        --ok: #3dd68c;
++      }
++      * { box-sizing: border-box; }
++      html, body {
++        margin: 0; padding: 0; height: 100%; overflow: hidden;
++        background: #0b1226;
++        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
++        font-size: 14px; color: var(--ink);
++      }
++
++      /* ---------- Loading screen ---------- */
++      #loader {
++        position: absolute; inset: 0; z-index: 1;
++        display: flex; align-items: center; justify-content: center;
++        background:
++          radial-gradient(ellipse at 50% 120%, rgba(255, 201, 23, 0.18), transparent 60%),
++          linear-gradient(160deg, #0b1a3d 0%, #003082 55%, #0b1226 100%);
++      }
++      #box {
++        width: min(440px, calc(100vw - 32px));
++        background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
++        padding: 28px 28px 24px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+         text-align: center;
+-        transition: opacity 0.3s;
+-        width: 100%;
+-        z-index: 3;
+-      }
+-      div.overlay > div {
+-        pointer-events: none;
+-      }
+-
+-      div.background > div, div.overlay > div {
+-        margin: auto;
+-      }
+-
+-      #filesystem {
+-        background-color: #e00000;
+-        border: 1px solid #fc6458;
+-        color: #fcf880;
+-        display: none;
+-        outline: #a00000;
+-        padding: 0 4px;
+-        width: 600px;
+-      }
+-
+-      #title, #message {
+-        background-color: #838383;
+-        border: 1px solid #a8a8a8;
+-        outline: 1px solid #626262;
+-        padding: 0 4px;
+-        min-width: 260px;
+-      }
+-
+-      #box.error #title, #box.error #message {
+-        background-color: #e00000;
+-        border: 1px solid #fc6458;
+-        outline: #a00000;
+-      }
+-      #box.error #message {
+-        color: #fcf880;
+-      }
+-
+-      #title {
+-        color: #fcfcfc;
+-        height: 20px;
+-        text-shadow: 1px 1px #101010;
+-      }
+-      #message {
+-        color: #101010;
+-        padding: 4px 4px;
+       }
++      #box .logo { display: inline-flex; gap: 10px; align-items: center; font-weight: 700; font-size: 22px; letter-spacing: .2px; }
++      #box .logo svg { width: 40px; height: 40px; }
++      #box .sub { color: var(--muted); margin: 6px 0 20px; }
++      #title { font-weight: 600; margin-bottom: 8px; }
++      #message { color: var(--muted); min-height: 20px; line-height: 1.5; }
++      .bar { height: 8px; border-radius: 99px; background: rgba(255,255,255,0.08); overflow: hidden; margin-top: 16px; }
++      .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--yellow), #ffe27a); transition: width .25s; }
++      #box.error #title { color: var(--danger); }
+ 
+       canvas.emscripten {
+-        border: 0px none;
+-        height: 100%;
+-        position: absolute;
+-        width: 100%;
+-        z-index: 2;
+-        /* OpenTTD draws the cursor itself */
+-        cursor: none !important;
++        border: 0; position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2;
++        cursor: none !important; /* OpenTTD draws its own cursor */
+       }
++
++      /* ---------- Toast ---------- */
++      #toast {
++        position: fixed; left: 50%; top: 56px; transform: translate(-50%, -20px);
++        z-index: 20; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
++        background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--yellow);
++        border-radius: 10px; padding: 10px 14px; max-width: min(520px, calc(100vw - 32px));
++        box-shadow: 0 10px 30px rgba(0,0,0,.4);
++      }
++      #toast.show { opacity: 1; transform: translate(-50%, 0); }
++
++      /* ---------- Side menu ---------- */
++      #tab {
++        position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 10;
++        writing-mode: vertical-rl; background: var(--blue); color: #fff; border: 1px solid var(--blue-2);
++        border-right: 0; border-radius: 10px 0 0 10px; padding: 14px 7px; cursor: pointer;
++        font: 600 13px/1 system-ui, sans-serif; letter-spacing: .5px; display: none;
++        box-shadow: -4px 0 16px rgba(0,0,0,.35);
++      }
++      #tab:hover { background: var(--blue-2); }
++      #tab span { color: var(--yellow); }
++      #panel {
++        position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 100vw); z-index: 11;
++        background: var(--panel); border-left: 1px solid var(--line); backdrop-filter: blur(8px);
++        transform: translateX(100%); transition: transform .25s ease; overflow-y: auto; cursor: auto;
++        box-shadow: -10px 0 40px rgba(0,0,0,.45);
++      }
++      #panel.open { transform: translateX(0); }
++      #panel * { cursor: auto; }
++      #panel button, #panel label.btn, #panel .lang button { cursor: pointer; }
++      .p-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
++      .p-head h2 { margin: 0; font-size: 16px; }
++      .p-sec { padding: 16px 18px; border-bottom: 1px solid var(--line); }
++      .p-sec h3 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--yellow); }
++      .p-sec p { margin: 0 0 12px; color: var(--muted); line-height: 1.45; }
++      .btn {
++        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
++        border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--ink);
++        padding: 9px 12px; border-radius: 8px; font: 500 13px system-ui, sans-serif; width: 100%;
++      }
++      .btn:hover { background: rgba(255,255,255,.12); }
++      .btn.primary { background: var(--yellow); color: #1a1a1a; border-color: var(--yellow); font-weight: 600; }
++      .btn.primary:hover { background: #ffd84d; }
++      .btn.danger { color: #ffb3b5; }
++      .btn:disabled { opacity: .5; }
++      .row { display: flex; gap: 8px; margin-top: 8px; }
++      .x { background: none; border: 0; color: var(--muted); font-size: 22px; line-height: 1; padding: 4px 8px; }
++      .x:hover { color: #fff; }
++      .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
++      .lang button { background: none; border: 0; color: var(--muted); padding: 5px 10px; font: 600 12px system-ui; }
++      .lang button.on { background: var(--yellow); color: #1a1a1a; }
++      .saves { list-style: none; margin: 8px 0 0; padding: 0; max-height: 240px; overflow-y: auto; }
++      .saves li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
++      .saves li:first-child { border-top: 0; }
++      .saves .n { flex: 1; min-width: 0; }
++      .saves .n b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++      .saves .n small { color: var(--muted); }
++      .saves .btn { width: auto; padding: 6px 9px; }
++      .empty { color: var(--muted); font-style: italic; }
++      .check { display: flex; gap: 8px; align-items: flex-start; color: var(--ink); margin-top: 4px; }
++      .check input { margin-top: 2px; accent-color: var(--yellow); }
++      .status { font-size: 12px; color: var(--muted); margin-top: 8px; }
++      .status.ok { color: var(--ok); }
++      .credits { font-size: 12px; color: var(--muted); line-height: 1.5; }
++      .credits a { color: #9cc0ff; }
++      input[type=file] { display: none; }
+     </style>
+   </head>
+   <body>
+-    <div class="background">
++    <div id="loader">
+       <div id="box">
+-        <div id="title">
+-          Loading ...
+-        </div>
+-        <div id="message">
++        <div class="logo">
++          <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="12" fill="#ffc917"/><rect x="10" y="20" width="44" height="24" rx="6" fill="#003082"/><rect x="15" y="25" width="10" height="8" fill="#ffc917"/><rect x="28" y="25" width="10" height="8" fill="#ffc917"/><rect x="41" y="25" width="8" height="8" fill="#ffc917"/><circle cx="20" cy="48" r="4" fill="#222"/><circle cx="44" cy="48" r="4" fill="#222"/></svg>
++          OpenTTD
+         </div>
++        <div class="sub" data-i18n="subtitle">Nederland Editie</div>
++        <div id="title" data-i18n="loading">Laden…</div>
++        <div id="message"></div>
++        <div class="bar"><i id="progress"></i></div>
+       </div>
+     </div>
+-    <div class="overlay" id="overlay">
+-      <div id="filesystem">
+-        Warning: savegames are stored in the Indexed DB of your browser.<br/>Your browser can delete savegames without notice!
+-      </div>
+-    </div>
+-    <div>
+-      <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+-    </div>
+ 
+-    <script type='text/javascript'>
+-      var statusElement = document.getElementById('status');
+-      var progressElement = document.getElementById('progress');
+-      var spinnerElement = document.getElementById('spinner');
++    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+ 
+-      var Module = {
+-        preRun: [],
+-        postRun: [],
+-        arguments: [],
+-        totalDependencies: 42,
+-        doneDependencies: 0,
+-        lastDependencies: 1,
++    <div id="toast"></div>
+ 
+-        print: function(text) {
+-            if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+-            console.log(text);
+-        },
++    <button id="tab" type="button"><span>☰</span>&nbsp;<b data-i18n="menu">Menu</b></button>
++    <aside id="panel" aria-hidden="true">
++      <div class="p-head">
++        <h2 data-i18n="menuTitle">Spelmenu</h2>
++        <div style="display:flex;gap:8px;align-items:center">
++          <div class="lang"><button type="button" data-lang="nl">NL</button><button type="button" data-lang="en">EN</button></div>
++          <button class="x" id="close" type="button" aria-label="Sluiten">×</button>
++        </div>
++      </div>
++
++      <section class="p-sec">
++        <h3 data-i18n="saveH">Savegames</h3>
++        <p data-i18n="saveP">Sla op via het diskette-icoon in het spel. Je savegame wordt dan automatisch gedownload.</p>
++        <label class="check"><input type="checkbox" id="autodl" checked> <span data-i18n="autoDl">Savegame automatisch downloaden bij opslaan</span></label>
++        <div class="row"><button class="btn primary" id="dlLatest" type="button" data-i18n="dlLatest">⬇ Laatste savegame downloaden</button></div>
++        <ul class="saves" id="saves"></ul>
++      </section>
++
++      <section class="p-sec">
++        <h3 data-i18n="loadH">Savegame terugzetten</h3>
++        <p data-i18n="loadP">Kies een .sav-bestand van je computer. Het spel herstart en gaat direct verder met die savegame.</p>
++        <label class="btn primary" for="upload" data-i18n="loadBtn">⬆ Savegame openen…</label>
++        <input type="file" id="upload" accept=".sav,.scn">
++        <p class="status" data-i18n="loadWarn">Let op: niet-opgeslagen voortgang van het huidige spel gaat verloren.</p>
++      </section>
++
++      <section class="p-sec">
++        <h3 data-i18n="gfxH">Graphics</h3>
++        <p data-i18n="gfxP">Standaard: OpenGFX2 Classic (snel). HD-graphics zijn veel scherper bij inzoomen, maar het is een eenmalige download van ±384 MB die in je browser bewaard blijft.</p>
++        <div id="gfxStatus" class="status"></div>
++        <div class="row">
++          <button class="btn primary" id="hdInstall" type="button" data-i18n="hdInstall">HD-graphics installeren</button>
++        </div>
++        <div class="row" id="hdRow" style="display:none">
++          <button class="btn" id="useClassic" type="button" data-i18n="useClassic">Gebruik Classic</button>
++          <button class="btn" id="useHd" type="button" data-i18n="useHd">Gebruik HD</button>
++        </div>
++        <div class="row" id="hdRemoveRow" style="display:none">
++          <button class="btn danger" id="hdRemove" type="button" data-i18n="hdRemove">HD-graphics verwijderen</button>
++        </div>
++        <div class="bar" id="hdBar" style="display:none"><i id="hdProgress"></i></div>
++      </section>
+ 
+-        printErr: function(text) {
+-            if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+-            console.error(text);
++      <section class="p-sec">
++        <h3 data-i18n="tipsH">Tips</h3>
++        <p data-i18n="tipsP">Nederlandse treinen, trams, stations en verkeersborden staan standaard aan bij een nieuw spel. Zoom in en uit met het muiswiel. Je spel wordt ook automatisch in je browser bewaard, maar download je savegames voor de zekerheid.</p>
++      </section>
++
++      <section class="p-sec credits">
++        <span data-i18n="credits">Gebaseerd op</span> <a href="https://www.openttd.org" target="_blank" rel="noopener">OpenTTD</a> (GPL v2),
++        <a href="https://github.com/OpenTTD/OpenGFX2" target="_blank" rel="noopener">OpenGFX2</a>,
++        Dutch Trainset 3XL, Dutch Tram Set, Dutch Road Furniture, Dutch Station Addition Set.
++      </section>
++    </aside>
++
++    <script>
++      /* ================= Translations ================= */
++      var TT_I18N = {
++        nl: {
++          subtitle: "Nederland Editie", loading: "Laden…", preparing: "Spel voorbereiden…", menu: "Menu", menuTitle: "Spelmenu",
++          saveH: "Savegames", saveP: "Sla op via het diskette-icoon in het spel. Je savegame wordt dan automatisch gedownload.",
++          autoDl: "Savegame automatisch downloaden bij opslaan", dlLatest: "⬇ Laatste savegame downloaden",
++          loadH: "Savegame terugzetten", loadP: "Kies een .sav-bestand van je computer. Het spel herstart en gaat direct verder met die savegame.",
++          loadBtn: "⬆ Savegame openen…", loadWarn: "Let op: niet-opgeslagen voortgang van het huidige spel gaat verloren.",
++          gfxH: "Graphics", gfxP: "Standaard: OpenGFX2 Classic (snel). HD-graphics zijn veel scherper bij inzoomen, maar het is een eenmalige download van ±384 MB die in je browser bewaard blijft.",
++          hdInstall: "HD-graphics installeren", useClassic: "Gebruik Classic", useHd: "Gebruik HD", hdRemove: "HD-graphics verwijderen",
++          tipsH: "Tips", tipsP: "Nederlandse treinen, trams, stations en verkeersborden staan standaard aan bij een nieuw spel. Zoom in en uit met het muiswiel. Je spel wordt ook automatisch in je browser bewaard, maar download je savegames voor de zekerheid.",
++          credits: "Gebaseerd op", noSaves: "Nog geen savegames.", dl: "Download", autosave: "autosave",
++          saved: "Savegame opgeslagen en gedownload: ", savedLocal: "Savegame opgeslagen: ",
++          loadingSave: "Savegame wordt geladen…", badFile: "Dit is geen geldig savegame-bestand (.sav).",
++          gfxClassic: "Actief: OpenGFX2 Classic", gfxHd: "Actief: OpenGFX2 HD", hdInstalled: "HD-graphics zijn geïnstalleerd.",
++          hdNotAvail: "HD-graphics zijn (nog) niet beschikbaar op deze server.",
++          hdConfirm: "HD-graphics downloaden (±384 MB)? Het spel herstart daarna. Sla eerst je spel op!",
++          hdDownloading: "HD-graphics downloaden… ", hdFailed: "Downloaden mislukt: ",
++          restartConfirm: "Het spel herstart hiervoor. Niet-opgeslagen voortgang gaat verloren. Doorgaan?",
++          langConfirm: "Spel herstarten om de taal te wijzigen? Niet-opgeslagen voortgang gaat verloren. (Annuleren wijzigt alleen dit menu.)",
++          fsWarn: "Je spel wordt in de browser bewaard, maar de browser kan dit zonder waarschuwing wissen. Download daarom je savegames.",
++          crash: "Het spel is gecrasht. Herlaad de pagina om opnieuw te beginnen.", crashT: "Crash :(",
++          exitT: "Bedankt voor het spelen!", exitM: "Herlaad de pagina om opnieuw te spelen.",
++          bootT: "Basisgraphics ontbreken", bootM: "Basisgraphics worden gedownload…"
+         },
++        en: {
++          subtitle: "Netherlands Edition", loading: "Loading…", preparing: "Preparing game…", menu: "Menu", menuTitle: "Game menu",
++          saveH: "Savegames", saveP: "Save using the floppy disk icon in the game. Your savegame is then downloaded automatically.",
++          autoDl: "Automatically download savegame when saving", dlLatest: "⬇ Download latest savegame",
++          loadH: "Restore savegame", loadP: "Choose a .sav file from your computer. The game restarts and continues straight from that savegame.",
++          loadBtn: "⬆ Open savegame…", loadWarn: "Note: unsaved progress in the current game will be lost.",
++          gfxH: "Graphics", gfxP: "Default: OpenGFX2 Classic (fast). HD graphics are much sharper when zoomed in, but they are a one-time download of about 384 MB, kept in your browser.",
++          hdInstall: "Install HD graphics", useClassic: "Use Classic", useHd: "Use HD", hdRemove: "Remove HD graphics",
++          tipsH: "Tips", tipsP: "Dutch trains, trams, stations and road signs are enabled by default in a new game. Zoom with the mouse wheel. Your game is also kept in your browser, but download your savegames to be safe.",
++          credits: "Based on", noSaves: "No savegames yet.", dl: "Download", autosave: "autosave",
++          saved: "Savegame saved and downloaded: ", savedLocal: "Savegame saved: ",
++          loadingSave: "Loading savegame…", badFile: "This is not a valid savegame file (.sav).",
++          gfxClassic: "Active: OpenGFX2 Classic", gfxHd: "Active: OpenGFX2 HD", hdInstalled: "HD graphics are installed.",
++          hdNotAvail: "HD graphics are not available on this server (yet).",
++          hdConfirm: "Download HD graphics (about 384 MB)? The game restarts afterwards. Save your game first!",
++          hdDownloading: "Downloading HD graphics… ", hdFailed: "Download failed: ",
++          restartConfirm: "The game will restart for this. Unsaved progress will be lost. Continue?",
++          langConfirm: "Restart the game to change its language? Unsaved progress will be lost. (Cancel only changes this menu.)",
++          fsWarn: "Your game is kept in the browser, but the browser may delete it without warning. So download your savegames.",
++          crash: "The game crashed. Reload the page to start again.", crashT: "Crash :(",
++          exitT: "Thank you for playing!", exitM: "Reload the page to play again.",
++          bootT: "Missing base graphics", bootM: "Downloading base graphics…"
++        }
++      };
+ 
+-        canvas: (function() {
+-          var canvas = document.getElementById('canvas');
++      function ttStore(key, val) {
++        try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; }
++      }
++      var ttLang = ttStore("tt_lang") || ((navigator.language || "nl").toLowerCase().indexOf("nl") === 0 ? "nl" : "en");
++      function T(k) { return (TT_I18N[ttLang] && TT_I18N[ttLang][k]) || TT_I18N.nl[k] || k; }
++      function applyLang() {
++        document.documentElement.lang = ttLang;
++        document.querySelectorAll("[data-i18n]").forEach(function (el) { el.textContent = T(el.getAttribute("data-i18n")); });
++        document.querySelectorAll(".lang button").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-lang") === ttLang); });
++        if (window.ttRefresh) window.ttRefresh();
++      }
++
++      var toastTimer;
++      function toast(msg, ms) {
++        var t = document.getElementById("toast");
++        t.textContent = msg; t.classList.add("show");
++        clearTimeout(toastTimer);
++        toastTimer = setTimeout(function () { t.classList.remove("show"); }, ms || 5000);
++      }
++
++      function setLoader(title, msg, frac) {
++        document.getElementById("loader").style.display = "flex";
++        if (title != null) document.getElementById("title").textContent = title;
++        if (msg != null) document.getElementById("message").textContent = msg;
++        if (frac != null) document.getElementById("progress").style.width = Math.round(Math.max(0, Math.min(1, frac)) * 100) + "%";
++      }
++
++      /* ================= Emscripten Module ================= */
++      var Module = {
++        preRun: [],
++        postRun: [function () {
++          document.getElementById("tab").style.display = "block";
++          setTimeout(function () { document.getElementById("loader").style.display = "none"; }, 300);
++        }],
++        arguments: [],
++        totalDependencies: 0,
+ 
+-          // As a default initial behavior, pop up an alert when webgl context is lost. To make your
+-          // application robust, you may want to override this behavior before shipping!
+-          // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
+-          canvas.addEventListener("webglcontextlost", function(e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
++        print: function (text) { console.log(text); },
++        printErr: function (text) { console.error(text); },
+ 
++        canvas: (function () {
++          var canvas = document.getElementById("canvas");
++          canvas.addEventListener("webglcontextlost", function (e) { alert("WebGL context lost. Please reload the page."); e.preventDefault(); }, false);
+           return canvas;
+         })(),
+ 
+-        setStatus: function(text) {
+-          if (document.getElementById("canvas").style.display == "none") return;
+-
++        setStatus: function (text) {
++          if (!text) return;
+           var m = text.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
+-
+           if (m) {
+-            text = "(" + m[2] + " / " + m[4] + ") " + m[1];
++            var mb = function (x) { return (x / 1048576).toFixed(1) + " MB"; };
++            setLoader(T("loading"), mb(+m[2]) + " / " + mb(+m[4]), +m[2] / +m[4]);
+           }
+-
+-          document.getElementById("message").innerHTML = text;
+         },
+ 
+-        monitorRunDependencies: function(left) {
+-          /* If it goes up, a new dependency was added; down means one is
+-           * removed. We only track the latter. */
+-          if (left < Module.lastDependencies) {
+-            Module.doneDependencies += 1;
+-          }
+-          Module.lastDependencies = left;
+-
+-          total = Module.totalDependencies;
+-          doing = Module.doneDependencies + 1;
+-          if (doing > total) {
+-            doing = total;
+-          }
+-
+-          document.getElementById("title").innerHTML = "(" + doing + " / " + total + ") Loading ...";
+-          document.getElementById("message").innerHTML = "Preparing game ...";
++        monitorRunDependencies: function (left) {
++          this.totalDependencies = Math.max(this.totalDependencies, left);
++          if (left === 0) setLoader(T("preparing"), "", 1);
+         },
+ 
+-        onBootstrap: function(current, total) {
++        onBootstrap: function (current, total) {
+           document.getElementById("canvas").style.display = "none";
+-
+-          document.getElementById("title").innerHTML = "Missing base graphics";
+-          document.getElementById("message").innerHTML = "OpenTTD is downloading base graphics.<br/><br/>" + current + " / " + total + " bytes downloaded.";
++          setLoader(T("bootT"), T("bootM"), total ? current / total : 0);
+         },
+-
+-        onBootstrapFailed: function(current, total) {
++        onBootstrapFailed: function () {
+           document.getElementById("canvas").style.display = "none";
+-
+-          document.getElementById("title").innerHTML = "Missing base graphics";
+-          document.getElementById("message").innerHTML = "Failed to download base graphics.<br/>The game cannot start without base graphics.<br/><br/>Please check your Internet connection and/or the console log.<br/>Reload your browser to try again.";
++          document.getElementById("box").className = "error";
++          setLoader(T("bootT"), T("crash"));
+         },
+-
+-        onBootstrapReload: function() {
++        onBootstrapReload: function () {
+           document.getElementById("canvas").style.display = "none";
+-
+-          document.getElementById("title").innerHTML = "Missing base graphics";
+-          document.getElementById("message").innerHTML = "Downloading base graphics done.<br/><br/>Your browser will reload to start the game.";
++          setLoader(T("bootT"), "…", 1);
+         },
+-
+-        onExit: function() {
++        onExit: function () {
+           document.getElementById("canvas").style.display = "none";
+-
+-          document.getElementById("title").innerHTML = "Thank you for playing!";
+-          document.getElementById("message").innerHTML = "We hope you enjoyed OpenTTD!<br/><br/>Reload your browser to restart the game.";
++          setLoader(T("exitT"), T("exitM"));
+         },
+-
+-        onAbort: function() {
++        onAbort: function () {
+           document.getElementById("canvas").style.display = "none";
+-
+           document.getElementById("box").className = "error";
+-          document.getElementById("title").innerHTML = "Crash :(";
+-          document.getElementById("message").innerHTML = "The game crashed!<br/><br/>Please reload your browser to restart the game.";
++          setLoader(T("crashT"), T("crash"));
+         },
++        onWarningFs: function () {
++          if (ttStore("tt_fswarn_shown")) return;
++          ttStore("tt_fswarn_shown", "1");
++          toast(T("fsWarn"), 10000);
++        }
++      };
++      window.onerror = function () { Module.onAbort(); };
+ 
+-        onWarningFs: function() {
+-          document.getElementById("filesystem").style.display = "inline-block";
+-          document.getElementById("overlay").style.opacity = 1;
+-          setTimeout(function() {
+-            document.getElementById("overlay").style.opacity = 0;
+-            setTimeout(function() {
+-              document.getElementById("filesystem").style.display = "none";
+-            }, 300);
+-          }, 10000);
++      /* ================= Web integration ================= */
++      var TT = {
++        personal: null,
++        HD_DIR: "baseset/OpenGFX2_HighDef",
++        HD_NAME: "OpenGFX2 High Def",
++        CLASSIC_NAME: "OpenGFX2 Classic",
++        DEFAULT_NEWGRFS: [
++          "Dutch_Trainset_3XL-3.3.0/dutchtrains.grf",
++          "Dutch_Tram_Set-2.0.2/dutchtramset.grf",
++          "Dutch_Road_Furniture-0.7.1/dutchroadfurniture.grf",
++          "Dutch_Station_Addition_Set-0.8/dstatadd_v0_8.grf"
++        ]
++      };
++
++      function cfgPath() { return TT.personal + "/openttd.cfg"; }
++      function readCfg() { try { return FS.readFile(cfgPath(), { encoding: "utf8" }); } catch (e) { return null; } }
++      function writeCfg(text) { FS.writeFile(cfgPath(), text); }
++
++      /* Set "key = value" inside [group] of an ini text (adds group/key when missing). */
++      function iniSet(text, group, key, value) {
++        var lines = text.split("\n"), start = -1, end = lines.length;
++        for (var i = 0; i < lines.length; i++) {
++          var l = lines[i].trim();
++          if (start < 0 && l === "[" + group + "]") { start = i; continue; }
++          if (start >= 0 && /^\[.*\]$/.test(l)) { end = i; break; }
++        }
++        var item = key + " = " + value;
++        if (start < 0) { lines.push("", "[" + group + "]", item); return lines.join("\n"); }
++        for (var j = start + 1; j < end; j++) {
++          if (lines[j].split("=")[0].trim() === key) { lines[j] = item; return lines.join("\n"); }
++        }
++        lines.splice(start + 1, 0, item);
++        return lines.join("\n");
++      }
++      function iniRemove(text, group, key) {
++        var lines = text.split("\n"), inGroup = false;
++        return lines.filter(function (line) {
++          var l = line.trim();
++          if (/^\[.*\]$/.test(l)) inGroup = (l === "[" + group + "]");
++          return !(inGroup && l.split("=")[0].trim() === key);
++        }).join("\n");
++      }
++      function iniGet(text, group, key) {
++        var inGroup = false, lines = (text || "").split("\n");
++        for (var i = 0; i < lines.length; i++) {
++          var l = lines[i].trim();
++          if (/^\[.*\]$/.test(l)) { inGroup = (l === "[" + group + "]"); continue; }
++          if (inGroup && l.split("=")[0].trim() === key) return l.substring(l.indexOf("=") + 1).trim();
++        }
++        return null;
++      }
++
++      function exists(p) { try { FS.stat(p); return true; } catch (e) { return false; } }
++      function hdInstalled() { return exists(TT.personal + "/" + TT.HD_DIR + "/opengfx2_32ez.obg"); }
++
++      function setGraphics(name) {
++        var cfg = readCfg() || "";
++        cfg = iniSet(cfg, "graphicsset", "name", name);
++        cfg = iniRemove(cfg, "graphicsset", "shortname");
++        cfg = iniRemove(cfg, "graphicsset", "extra_version");
++        cfg = iniRemove(cfg, "graphicsset", "extra_params");
++        cfg = iniSet(cfg, "misc", "blitter", "\"\"");
++        writeCfg(cfg);
++      }
++
++      /* Called by pre.js once the persistent storage has been loaded, before the game starts. */
++      window.tt_after_fs_load = function (personal) {
++        TT.personal = personal;
++        ["save", "save/autosave", "baseset"].forEach(function (d) {
++          if (!exists(personal + "/" + d)) FS.mkdirTree(personal + "/" + d);
++        });
++
++        if (!exists(cfgPath())) {
++          /* First start: Dutch defaults. */
++          var cfg = [
++            "[misc]",
++            "language = " + (ttLang === "nl" ? "dutch.lng" : "english.lng"),
++            "",
++            "[graphicsset]",
++            "name = " + TT.CLASSIC_NAME,
++            "",
++            "[game_creation]",
++            "town_name = dutch",
++            "landscape = temperate",
++            "",
++            "[locale]",
++            "currency = EUR",
++            "units_velocity = metric",
++            "units_power = metric",
++            "units_weight = metric",
++            "units_volume = metric",
++            "units_force = si",
++            "units_height = metric",
++            "",
++            "[network]",
++            "participate_survey = no",
++            "",
++            "[newgrf]"
++          ].concat(TT.DEFAULT_NEWGRFS.map(function (g) { return g + " = "; })).join("\n") + "\n";
++          writeCfg(cfg);
++        }
++
++        /* If the HD set was removed, make sure the game does not look for it. */
++        if (!hdInstalled() && iniGet(readCfg(), "graphicsset", "name") === TT.HD_NAME) setGraphics(TT.CLASSIC_NAME);
++
++        /* Pending "restart from savegame". */
++        var pending = null;
++        try { pending = sessionStorage.getItem("tt_load"); sessionStorage.removeItem("tt_load"); } catch (e) {}
++        if (pending && exists(pending)) {
++          Module.arguments.push("-g", pending);
++          setTimeout(function () { toast(T("loadingSave") + " " + pending.split("/").pop(), 4000); }, 500);
+         }
+       };
+ 
+-      window.onerror = function() {
+-        Module.onAbort();
++      function download(path) {
++        var data = FS.readFile(path);
++        var blob = new Blob([data], { type: "application/octet-stream" });
++        var a = document.createElement("a");
++        a.href = URL.createObjectURL(blob);
++        a.download = path.split("/").pop();
++        document.body.appendChild(a); a.click(); a.remove();
++        setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
++      }
++
++      function resolveSave(path) {
++        if (path.charAt(0) === "/" && exists(path)) return path;
++        var p = TT.personal + "/save/" + path;
++        if (exists(p)) return p;
++        if (exists(p + ".sav")) return p + ".sav";
++        return null;
++      }
++
++      /* Called by the game (via pre.js) after a manual save succeeded. */
++      window.tt_on_game_saved = function (path) {
++        var full = resolveSave(path);
++        if (!full) return;
++        var name = full.split("/").pop();
++        if (document.getElementById("autodl").checked) {
++          setTimeout(function () { download(full); }, 50);
++          toast(T("saved") + name);
++        } else {
++          toast(T("savedLocal") + name);
++        }
++        window.ttRefresh();
+       };
++
++      function listSaves() {
++        var out = [];
++        [["save", false], ["save/autosave", true]].forEach(function (d) {
++          var dir = TT.personal + "/" + d[0];
++          var names = [];
++          try { names = FS.readdir(dir); } catch (e) { return; }
++          names.forEach(function (n) {
++            if (!/\.sav$/i.test(n)) return;
++            try {
++              var st = FS.stat(dir + "/" + n);
++              out.push({ path: dir + "/" + n, name: n, auto: d[1], mtime: +st.mtime, size: st.size });
++            } catch (e) {}
++          });
++        });
++        return out.sort(function (a, b) { return b.mtime - a.mtime; });
++      }
++
++      window.ttRefresh = function () {
++        if (!TT.personal || typeof FS === "undefined") return;
++        var saves = listSaves(), ul = document.getElementById("saves");
++        ul.innerHTML = "";
++        if (!saves.length) {
++          var li = document.createElement("li"); li.className = "empty"; li.textContent = T("noSaves"); ul.appendChild(li);
++        }
++        saves.forEach(function (s) {
++          var li = document.createElement("li");
++          var n = document.createElement("div"); n.className = "n";
++          var b = document.createElement("b"); b.textContent = s.name; b.title = s.name;
++          var sm = document.createElement("small");
++          sm.textContent = new Date(s.mtime).toLocaleString(ttLang === "nl" ? "nl-NL" : "en-GB") + " · " + (s.size / 1024).toFixed(0) + " kB" + (s.auto ? " · " + T("autosave") : "");
++          n.appendChild(b); n.appendChild(sm);
++          var btn = document.createElement("button"); btn.className = "btn"; btn.type = "button"; btn.textContent = "⬇ " + T("dl");
++          btn.onclick = function () { download(s.path); };
++          li.appendChild(n); li.appendChild(btn); ul.appendChild(li);
++        });
++        document.getElementById("dlLatest").disabled = !saves.length;
++
++        var hd = hdInstalled(), active = iniGet(readCfg(), "graphicsset", "name");
++        var st = document.getElementById("gfxStatus");
++        st.textContent = active === TT.HD_NAME ? T("gfxHd") : T("gfxClassic");
++        st.className = "status" + (active === TT.HD_NAME ? " ok" : "");
++        document.getElementById("hdInstall").parentNode.style.display = hd ? "none" : "flex";
++        document.getElementById("hdRow").style.display = hd ? "flex" : "none";
++        document.getElementById("hdRemoveRow").style.display = hd ? "flex" : "none";
++      };
++
++      function syncAndReload() {
++        FS.syncfs(false, function () { location.reload(); });
++      }
++
++      /* ---------- HD graphics: downloaded once from ./hd/ and kept in IndexedDB ---------- */
++      async function installHd() {
++        if (!confirm(T("hdConfirm"))) return;
++        var bar = document.getElementById("hdBar"), prog = document.getElementById("hdProgress"), st = document.getElementById("gfxStatus");
++        var btn = document.getElementById("hdInstall");
++        btn.disabled = true;
++        try {
++          if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist().catch(function () {}); } catch (e) {} }
++          var res = await fetch("hd/manifest.json", { cache: "no-cache" });
++          if (!res.ok) { toast(T("hdNotAvail")); btn.disabled = false; return; }
++          var manifest = await res.json();
++          var total = manifest.files.reduce(function (a, f) { return a + f.size; }, 0), done = 0;
++          bar.style.display = "block";
++          var dir = TT.personal + "/" + TT.HD_DIR;
++          FS.mkdirTree(dir);
++          for (var i = 0; i < manifest.files.length; i++) {
++            var f = manifest.files[i];
++            var buf = new Uint8Array(f.size), off = 0;
++            for (var j = 0; j < f.parts.length; j++) {
++              var r = await fetch("hd/" + f.parts[j]);
++              if (!r.ok) throw new Error(f.parts[j] + " (" + r.status + ")");
++              var reader = r.body.getReader();
++              for (;;) {
++                var chunk = await reader.read();
++                if (chunk.done) break;
++                buf.set(chunk.value, off); off += chunk.value.length; done += chunk.value.length;
++                prog.style.width = (done / total * 100).toFixed(1) + "%";
++                st.textContent = T("hdDownloading") + (done / 1048576).toFixed(0) + " / " + (total / 1048576).toFixed(0) + " MB";
++              }
++            }
++            if (off !== f.size) throw new Error(f.name + ": size mismatch");
++            FS.writeFile(dir + "/" + f.name, buf, { canOwn: true });
++          }
++          setGraphics(TT.HD_NAME);
++          st.textContent = T("hdInstalled");
++          syncAndReload();
++        } catch (e) {
++          console.error(e);
++          toast(T("hdFailed") + e.message, 8000);
++          try { FS.readdir(TT.personal + "/" + TT.HD_DIR).forEach(function (n) { if (n !== "." && n !== "..") FS.unlink(TT.personal + "/" + TT.HD_DIR + "/" + n); }); } catch (x) {}
++          btn.disabled = false; bar.style.display = "none";
++        }
++      }
++
++      function removeHd() {
++        if (!confirm(T("restartConfirm"))) return;
++        var dir = TT.personal + "/" + TT.HD_DIR;
++        try { FS.readdir(dir).forEach(function (n) { if (n !== "." && n !== "..") FS.unlink(dir + "/" + n); }); FS.rmdir(dir); } catch (e) {}
++        setGraphics(TT.CLASSIC_NAME);
++        syncAndReload();
++      }
++
++      function useGraphics(name) {
++        if (iniGet(readCfg(), "graphicsset", "name") === name) return;
++        if (!confirm(T("restartConfirm"))) return;
++        setGraphics(name);
++        syncAndReload();
++      }
++
++      /* ---------- Upload savegame and restart from it ---------- */
++      async function uploadSave(file) {
++        if (!file) return;
++        var data = new Uint8Array(await file.arrayBuffer());
++        /* OpenTTD savegames start with a 4-byte compression tag (OTTX, OTTN, OTTZ, OTTD, OTTS). */
++        var tag = String.fromCharCode(data[0], data[1], data[2]);
++        if (data.length < 8 || tag !== "OTT") { toast(T("badFile"), 6000); return; }
++        if (!confirm(T("restartConfirm"))) return;
++        var name = file.name.replace(/[^\w.\- ()]/g, "_");
++        if (!/\.(sav|scn)$/i.test(name)) name += ".sav";
++        var path = TT.personal + "/save/" + name;
++        FS.writeFile(path, data);
++        try { sessionStorage.setItem("tt_load", path); } catch (e) {}
++        setLoader(T("loadingSave"), name, 0);
++        syncAndReload();
++      }
++
++      /* ---------- Panel wiring ---------- */
++      (function () {
++        var panel = document.getElementById("panel");
++        function openPanel(o) {
++          panel.classList.toggle("open", o); panel.setAttribute("aria-hidden", !o);
++          if (o) window.ttRefresh();
++        }
++        document.getElementById("tab").onclick = function () { openPanel(true); };
++        document.getElementById("close").onclick = function () { openPanel(false); };
++        document.getElementById("canvas").addEventListener("mousedown", function () { openPanel(false); });
++        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && panel.classList.contains("open")) openPanel(false); });
++
++        var autodl = document.getElementById("autodl");
++        autodl.checked = ttStore("tt_autodl") !== "0";
++        autodl.onchange = function () { ttStore("tt_autodl", autodl.checked ? "1" : "0"); };
++
++        document.getElementById("dlLatest").onclick = function () {
++          var s = listSaves();
++          if (s.length) download(s[0].path);
++        };
++        document.getElementById("upload").onchange = function (e) { uploadSave(e.target.files[0]); e.target.value = ""; };
++        document.getElementById("hdInstall").onclick = installHd;
++        document.getElementById("hdRemove").onclick = removeHd;
++        document.getElementById("useClassic").onclick = function () { useGraphics(TT.CLASSIC_NAME); };
++        document.getElementById("useHd").onclick = function () { useGraphics(TT.HD_NAME); };
++
++        document.querySelectorAll(".lang button").forEach(function (b) {
++          b.onclick = function () {
++            var l = b.getAttribute("data-lang");
++            if (l === ttLang) return;
++            ttLang = l; ttStore("tt_lang", l); applyLang();
++            if (TT.personal && confirm(T("langConfirm"))) {
++              writeCfg(iniSet(readCfg() || "", "misc", "language", l === "nl" ? "dutch.lng" : "english.lng"));
++              syncAndReload();
++            }
++          };
++        });
++
++        /* Keep panel inputs from leaking keystrokes into the game. */
++        panel.addEventListener("keydown", function (e) { e.stopPropagation(); });
++        panel.addEventListener("keyup", function (e) { e.stopPropagation(); });
++
++        applyLang();
++        setLoader(T("loading"), "", 0);
++      })();
+     </script>
+     {{{ SCRIPT }}}
+   </body>
+--- a/src/saveload/saveload.cpp
++++ b/src/saveload/saveload.cpp
+@@ -3322,7 +3322,17 @@
+ 			Debug(desync, 1, "save: {:08x}; {:02x}; {}", TimerGameEconomy::date, TimerGameEconomy::date_fract, filename);
+ 			if (!_settings_client.gui.threaded_saves) threaded = false;
+ 
++#ifdef __EMSCRIPTEN__
++			threaded = false;
++			SaveOrLoadResult em_res = DoSave(std::make_shared<FileWriter>(std::move(*fh)), threaded);
++			if (em_res == SL_OK && dft == DFT_GAME_FILE && sb != AUTOSAVE_DIR) {
++				std::string em_name(filename);
++				EM_ASM({ if (window["openttd_game_saved"]) openttd_game_saved(UTF8ToString($0)); }, em_name.c_str());
++			}
++			return em_res;
++#else
+ 			return DoSave(std::make_shared<FileWriter>(std::move(*fh)), threaded);
++#endif
+ 		}
+ 
+ 		/* LOAD game */

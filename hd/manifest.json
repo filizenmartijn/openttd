@@ -1,0 +1,67 @@
+{
+ "set": "OpenGFX2 High Def 0.8.1",
+ "files": [
+  {
+   "name": "license.txt",
+   "size": 18092,
+   "parts": [
+    "license.txt.000"
+   ]
+  },
+  {
+   "name": "ogfx21_base_32ez.grf",
+   "size": 60403313,
+   "parts": [
+    "ogfx21_base_32ez.grf.000",
+    "ogfx21_base_32ez.grf.001"
+   ]
+  },
+  {
+   "name": "ogfx2c_arctic_32ez.grf",
+   "size": 14239160,
+   "parts": [
+    "ogfx2c_arctic_32ez.grf.000"
+   ]
+  },
+  {
+   "name": "ogfx2e_extra_32ez.grf",
+   "size": 255447196,
+   "parts": [
+    "ogfx2e_extra_32ez.grf.000",
+    "ogfx2e_extra_32ez.grf.001",
+    "ogfx2e_extra_32ez.grf.002",
+    "ogfx2e_extra_32ez.grf.003",
+    "ogfx2e_extra_32ez.grf.004",
+    "ogfx2e_extra_32ez.grf.005"
+   ]
+  },
+  {
+   "name": "ogfx2h_tropical_32ez.grf",
+   "size": 23150203,
+   "parts": [
+    "ogfx2h_tropical_32ez.grf.000"
+   ]
+  },
+  {
+   "name": "ogfx2i_logos_32ez.grf",
+   "size": 21159816,
+   "parts": [
+    "ogfx2i_logos_32ez.grf.000"
+   ]
+  },
+  {
+   "name": "ogfx2t_toyland_32ez.grf",
+   "size": 9580628,
+   "parts": [
+    "ogfx2t_toyland_32ez.grf.000"
+   ]
+  },
+  {
+   "name": "opengfx2_32ez.obg",
+   "size": 8321,
+   "parts": [
+    "opengfx2_32ez.obg.000"
+   ]
+  }
+ ]
+}

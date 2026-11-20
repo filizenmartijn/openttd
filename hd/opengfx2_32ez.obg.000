@@ -1,0 +1,57 @@
+[metadata]
+name              = OpenGFX2 High Def
+shortname         = ogFX
+version           = 9480
+palette           = DOS
+blitter           = 32bpp
+url               = https://github.com/OpenTTD/OpenGFX2/
+description.pt_BR = Conjunto de gráficos base em estilo pixel art OpenGFX2 para OpenTTD, variante de alta definição (para ampliação extra de 32 bpp). Disponível gratuitamente sob os termos da Licença Pública Geral, GNU versão 2+. [OpenGFX2 0.8.1 32ez]
+description.ca_ES = Paquet de gràfics base d'estil píxel art OpenGFX2 per a l'OpenTTD amb la variant d'alta definició (nivell de zoom extra de 32bpp). Disponible sota els termes de la GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.da_DK = OpenGFX2 pixel art-stil baseret grafiksæt til OpenTTD, høj definitions-variant (ekstra zoom 32bpp). Frit tilgængeligt under GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.nl_NL = Basisset grafische elementen in OpenGFX2-pixelstijl voor OpenTTD, variant hoge resolutie (extra zoom 32bpp). Vrij beschikbaar onder de GNU General Public License versie 2+. [OpenGFX2 0.8.1 32ez]
+description.en_AU = OpenGFX2 pixel art style base graphics set for OpenTTD, high definition variant (extra zoom 32bpp). Freely available under the terms of the GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.en_US = OpenGFX2 pixel art style base graphics set for OpenTTD, high definition variant (extra zoom 32bpp). Freely available under the terms of the GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.fi_FI = OpenGFX2 – pikselitaidetyylinen perusgrafiikkakokoelma OpenTTD
+description.fr_FR = OpenGFX2, un set de graphismes de base en pixel art pour OpenTTD, dans sa variante haute définition (zoom extra 32bpp). Disponibles librement selon les termes de la Licence Publique Générale GNU version 2+. [OpenGFX2 0.8.1 32ez]
+description.gl_ES = OpenGFX2 pixel art style base graphics set for OpenTTD, high definition variant (extra zoom 32bpp). Freely available under the terms of the GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.de_DE = OpenGFX2-Pixelkunststil-Basisgrafikset für OpenTTD, hochauflösende Variante (Extra-Zoom, 32bpp). Frei verfügbar unter den Bedingungen der GNU General Public License, Version 2+. [OpenGFX2 0.8.1 32ez]
+description.hu_HU = Az OpenGFX2 pixelgrafikás grafikus alapkészlet az OpenTTD-hez, nagyfelbontású változat (extra nagyítás, 32bpp). Szabadon elérhető a GNU General Public License 2-es verziójának feltételei szerint. [OpenGFX2 0.8.1 32ez]
+description.ja_JP = OpenTTD 向け・ピクセルアートスタイルの OpenGFX2 ベースグラフィックセットの高精細仕様(Extra Zoom 32bpp)。GNU General Public License version 2+ のもとで自由に利用できます。[OpenGFX2 0.8.1 32ez]
+description.ko_KR = OpenTTD용 고해상도 버전 (32bpp) OpenGFX2 픽셀 아트 스타일 기본 그래픽 세트입니다. GNU 일반 공중 라이선스(GPL) 버전 2 이상의 약관에 의거하여 자유롭게 사용할 수 있습니다. [OpenGFX2 0.8.1 32ez]
+description.lv_LV = OpenGFX2 pixel art style base graphics set for OpenTTD, high definition variant (extra zoom 32bpp). Freely available under the terms of the GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.lb_LU = OpenGFX2 pixel art style base graphics set for OpenTTD, high definition variant (extra zoom 32bpp). Freely available under the terms of the GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.mi_NZ = Kohinga whakairoiro toi tongi mātāmua o OpenGFX2 mō OpenTTD, tangongitanga arinui (topa tāpiri 32bpp). Kei te wātea noa i ngā ture o te GNU General Public License, whakaputanga 2+. [OpenGFX2 0.8.1 32ez]
+description.nb_NO = OpenGFX2 pixel-art grafikkstilgrunnpakke for OpenTTD, høyoppløst variant (ekstra zoom 32bpp). Fritt tilgjengelig under vilkårene til GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.fa_IR = مجموعه گرافیکی پایه OpenGFX2 با سبک هنری پیکسلی برای OpenTTD، نسخه با کیفیت بالا (بزرگنمایی اضافی 32 بیتی). به صورت رایگان تحت شرایط مجوز عمومی همگانی گنو نسخه 2+ در دسترس است. [OpenGFX2 0.8.1 32ez]
+description.pl_PL = OpenGFX2, podstawowy zestaw grafik dla OpenTTD w stylu „pixel art”, wariant wysokiej rozdzielczości (większe przybliżenie, 32-bitowa paleta kolorów). Dostępny swobodnie na warunkach licencji GNU General Public License w wersji 2+. [OpenGFX2 0.8.1 32ez]
+description.pt_PT = Conjunto de gráficos base em estilo pixel art OpenGFX2 para OpenTTD, variante de alta definição (para ampliação extra de 32 bpp). Disponível livremente nos termos da Licença Pública Geral, GNU versão 2+. [OpenGFX2 0.8.1 32ez]
+description.ro_RO = Set grafică de bază în stil pixelat OpenGFX2 pentru OpenTTD, variantă de înaltă definiție (zoom suplimentar 32bpp). Disponibil gratuit în conformitate cu termenii GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.ru_RU = OpenGFX2, основной графический набор для OpenTTD в стиле пиксель-арт; вариант в высоком разрешении. Свободно распространяется в соответствии с условиями GNU General Public License версии 2+. [OpenGFX2 0.8.1 32ez]
+description.zh_CN = 在 OpenTTD 中使用的 OpenGFX2 基本图形集，高清版本（额外缩放，32bpp）。在 GNU General Public License 第 2 版及以上版本授权下自由使用。[OpenGFX2 0.8.1 32ez]
+description.es_ES = OpenGFX2 pixel art style base graphics set for OpenTTD, high definition variant (extra zoom 32bpp). Freely available under the terms of the GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.es_MX = OpenGFX2 pixel art style base graphics set for OpenTTD, high definition variant (extra zoom 32bpp). Freely available under the terms of the GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.sv_SE = Basgrafik i OpenGFX2 pixelstil för OpenTTD, högupplöst (extra zoom 32bpp). Fritt tillgänglig under GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description.zh_TW = 適用於 OpenTTD 使用的 OpenGFX2 像素藝術風格基本圖形集，高畫質變體（額外縮放 32bpp）。根據 GNU 通用公共授權條款第 2 版及以上之版本的許可下自由使用。［OpenGFX2 0.8.1 32ez］
+description.tr_TR = OpenTTD için OpenGFX2 piksel sanatı biçiminde temel grafik seti, yüksek çözünürlüklü sürüm (fazladan yakınlaştırma 32bpp). GNU Genel Kamu Lisansı 2+ sürümü şartlarına göre özgürce edinilebilir. [OpenGFX2 0.8.1 32ez]
+description.vi_VN = Bộ đồ họa nền tảng OpenGFX2 kiểu pixel art dành cho OpenTTD, phiên bản độ phân giải cao (phóng lên 32bpp). Được phát hành miễn phí dưới các điều khoản của Giấy phép công cộng GNU phiên bản 2 hoặc mọi phiên bản sau. [OpenGFX2 0.8.1 32ez]
+description.cy_GB = OpenGFX2 pixel art style base graphics set for OpenTTD, high definition variant (extra zoom 32bpp). Freely available under the terms of the GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+description       = OpenGFX2 pixel art style base graphics set for OpenTTD, high definition variant (extra zoom 32bpp). Freely available under the terms of the GNU General Public License version 2+. [OpenGFX2 0.8.1 32ez]
+
+[files]
+base     = ogfx21_base_32ez.grf
+arctic   = ogfx2c_arctic_32ez.grf
+tropical = ogfx2h_tropical_32ez.grf
+toyland  = ogfx2t_toyland_32ez.grf
+logos    = ogfx2i_logos_32ez.grf
+extra    = ogfx2e_extra_32ez.grf
+
+[md5s]
+ogfx21_base_32ez.grf     = 5d83f4f22307448b1083461ce15deac4
+ogfx2c_arctic_32ez.grf   = e30b131412378e29f215e35dc878e6a6
+ogfx2h_tropical_32ez.grf = a430d61120ebdc9a290a272ec3fb3002
+ogfx2t_toyland_32ez.grf  = 0f9667022bbeb83e0c10e13c428aba48
+ogfx2i_logos_32ez.grf    = 53030590b9ff87b4cff119556d301d2c
+ogfx2e_extra_32ez.grf    = d33c8f84e1a6e9b6f036395f5be4747a
+
+[origin]
+default = Available from the in-game content download system (BaNaNaS) or https://github.com/OpenTTD/OpenGFX2/
